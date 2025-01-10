@@ -224,8 +224,16 @@ func (g *Git) CacheKey() (string, bool) {
 		return "", false
 	}
 
-	ref := g.FileContents(dir.Path, "HEAD")
+	if !g.isRepo(dir) {
+		return "", false
+	}
+
+	// Read the HEAD from the real repo directory.
+	ref := g.FileContents(g.workingDir, "HEAD")
 	ref = strings.Replace(ref, "ref: refs/heads/", "", 1)
+
+	// Use the repo clone in the cache key so the mapped path is consistent
+	// for primary and worktree repos.
 	return fmt.Sprintf("%s@%s", dir.Path, ref), true
 }
 
@@ -349,10 +357,15 @@ func (g *Git) shouldDisplay() bool {
 		return false
 	}
 
+	return g.isRepo(gitdir)
+}
+
+func (g *Git) isRepo(gitdir *runtime.FileInfo) bool {
 	g.setDir(gitdir.Path)
 
 	if !gitdir.IsDir {
 		if g.hasWorktree(gitdir) {
+			// g.workingDir will contain the worktree repo dir.
 			g.realDir = g.convertToWindowsPath(g.realDir)
 			return true
 		}
